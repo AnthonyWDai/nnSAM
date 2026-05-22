@@ -16,6 +16,7 @@ from mobile_sam.modeling.tiny_vit_sam import TinyViT
 import requests
 import os
 
+
 def download_model(url,destination):
 
     chunk_size = 8192  # Size of each chunk in bytes
@@ -29,8 +30,6 @@ def download_model(url,destination):
         print("Weights downloaded successfully.")
     else:
         print("Failed to download file. Status code:", response.status_code)
-
-
 
 
 class PlainConvUNet(nn.Module):
@@ -133,7 +132,7 @@ class SAMConvUNet(nn.Module):
                                    nonlin_first=nonlin_first)
         
 
-        save_path = nnUNet_raw
+        save_path = os.environ["WEIGHT_PATH"]
         model_weight_path = os.path.join(save_path, "mobile_sam.pt")
 
         if not os.path.exists(model_weight_path):
