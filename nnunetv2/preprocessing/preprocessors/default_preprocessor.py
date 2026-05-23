@@ -36,22 +36,32 @@ class DefaultPreprocessor(object):
         """
 
     def run_case(self, image_files: List[str], seg_file: Union[str, None], plans_manager: PlansManager,
-                 configuration_manager: ConfigurationManager,
-                 dataset_json: Union[dict, str]):
+                configuration_manager: ConfigurationManager,
+                dataset_json: Union[dict, str], TDSAMMode: bool):
         """
         seg file can be none (test cases)
-
         order of operations is: transpose -> crop -> resample
         so when we export we need to run the following order: resample -> crop -> transpose (we could also run
         transpose at a different place, but reverting the order of operations done during preprocessing seems cleaner)
         """
         if isinstance(dataset_json, str):
             dataset_json = load_json(dataset_json)
-
         rw = plans_manager.image_reader_writer_class()
 
         # load image(s)
         data, data_properites = rw.read_images(image_files)
+
+        # If TDSAMMode is enabled and there are exactly 2 image modalities,
+        # create a 3rd modality as the average of the first two.
+        # Expected data shape: (C, ...)
+        if TDSAMMode:
+            if data.shape[0] == 2:
+                avg_modality = ((data[0].astype(np.float32) + data[1].astype(np.float32)) / 2.0)[None]
+                data = np.concatenate((data, avg_modality), axis=0)
+            else:
+                if self.verbose:
+                    print(f"TDSAMMode=True, but found {data.shape[0]} modalities. "
+                        f"Skipping synthetic 3rd modality generation.")
 
         # if possible, load seg
         if seg_file is not None:
@@ -68,15 +78,14 @@ class DefaultPreprocessor(object):
         # crop, remember to store size before cropping!
         shape_before_cropping = data.shape[1:]
         data_properites['shape_before_cropping'] = shape_before_cropping
+
         # this command will generate a segmentation. This is important because of the nonzero mask which we may need
         data, seg, bbox = crop_to_nonzero(data, seg)
         data_properites['bbox_used_for_cropping'] = bbox
-        # print(data.shape, seg.shape)
         data_properites['shape_after_cropping_and_before_resampling'] = data.shape[1:]
 
         # resample
         target_spacing = configuration_manager.spacing  # this should already be transposed
-
         if len(target_spacing) < len(data.shape[1:]):
             # target spacing for 2d has 2 entries but the data and original_spacing have three because everything is 3d
             # in 3d we do not change the spacing between slices
@@ -87,16 +96,15 @@ class DefaultPreprocessor(object):
         # normalization MUST happen before resampling or we get huge problems with resampled nonzero masks no
         # longer fitting the images perfectly!
         data = self._normalize(data, seg, configuration_manager,
-                               plans_manager.foreground_intensity_properties_per_channel)
+                            plans_manager.foreground_intensity_properties_per_channel)
 
-        # print('current shape', data.shape[1:], 'current_spacing', original_spacing,
-        #       '\ntarget shape', new_shape, 'target_spacing', target_spacing)
         old_shape = data.shape[1:]
         data = configuration_manager.resampling_fn_data(data, new_shape, original_spacing, target_spacing)
         seg = configuration_manager.resampling_fn_seg(seg, new_shape, original_spacing, target_spacing)
+
         if self.verbose:
             print(f'old shape: {old_shape}, new_shape: {new_shape}, old_spacing: {original_spacing}, '
-                  f'new_spacing: {target_spacing}, fn_data: {configuration_manager.resampling_fn_data}')
+                f'new_spacing: {target_spacing}, fn_data: {configuration_manager.resampling_fn_data}')
 
         # if we have a segmentation, sample foreground locations for oversampling and add those to properties
         if seg_file is not None:
@@ -112,21 +120,23 @@ class DefaultPreprocessor(object):
             if label_manager.has_ignore_label:
                 collect_for_this.append(label_manager.all_labels)
 
-            # no need to filter background in regions because it is already filtered in handle_labels
-            # print(all_labels, regions)
-            data_properites['class_locations'] = self._sample_foreground_locations(seg, collect_for_this,
-                                                                                   verbose=self.verbose)
+            data_properites['class_locations'] = self._sample_foreground_locations(
+                seg, collect_for_this, verbose=self.verbose
+            )
             seg = self.modify_seg_fn(seg, plans_manager, dataset_json, configuration_manager)
-        if np.max(seg) > 127:
-            seg = seg.astype(np.int16)
-        else:
-            seg = seg.astype(np.int8)
+
+        if seg is not None:
+            if np.max(seg) > 127:
+                seg = seg.astype(np.int16)
+            else:
+                seg = seg.astype(np.int8)
+
         return data, seg, data_properites
 
     def run_case_save(self, output_filename_truncated: str, image_files: List[str], seg_file: str,
                       plans_manager: PlansManager, configuration_manager: ConfigurationManager,
-                      dataset_json: Union[dict, str]):
-        data, seg, properties = self.run_case(image_files, seg_file, plans_manager, configuration_manager, dataset_json)
+                      dataset_json: Union[dict, str], TDSAMMode: bool):
+        data, seg, properties = self.run_case(image_files, seg_file, plans_manager, configuration_manager, dataset_json, TDSAMMode)
         # print('dtypes', data.dtype, seg.dtype)
         np.savez_compressed(output_filename_truncated + '.npz', data=data, seg=seg)
         write_pickle(properties, output_filename_truncated + '.pkl')
@@ -175,7 +185,7 @@ class DefaultPreprocessor(object):
         return data
 
     def run(self, dataset_name_or_id: Union[int, str], configuration_name: str, plans_identifier: str,
-            num_processes: int):
+            num_processes: int, TDSAMMode: bool):
         """
         data identifier = configuration name in plans. EZ.
         """
@@ -216,7 +226,7 @@ class DefaultPreprocessor(object):
         # list of segmentation filenames
         seg_fnames = [join(nnUNet_raw, dataset_name, 'labelsTr', i + file_ending) for i in identifiers]
 
-        _ = ptqdm(self.run_case_save, (output_filenames_truncated, image_fnames, seg_fnames),
+        _ = ptqdm(self.run_case_save, (output_filenames_truncated, image_fnames, seg_fnames, TDSAMMode),
                   processes=num_processes, zipped=True, plans_manager=plans_manager,
                   configuration_manager=configuration_manager,
                   dataset_json=dataset_json, disable=self.verbose)

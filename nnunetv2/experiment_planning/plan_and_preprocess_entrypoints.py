@@ -23,8 +23,9 @@ def extract_fingerprint_entry():
     parser.add_argument('--verbose', required=False, action='store_true',
                         help='Set this to print a lot of stuff. Useful for debugging. Will disable progrewss bar! '
                              'Recommended for cluster environments')
+    parser.add_argument('--td_sam_mode', action="store_true", help='make it available for 3d')
     args, unrecognized_args = parser.parse_known_args()
-    extract_fingerprints(args.d, args.fpe, args.np, args.verify_dataset_integrity, args.clean, args.verbose)
+    extract_fingerprints(args.d, args.fpe, args.np, args.verify_dataset_integrity, args.clean, args.verbose, args.td_sam_mode)
 
 
 def plan_experiment_entry():
@@ -93,8 +94,9 @@ def preprocess_entry():
     parser.add_argument('--verbose', required=False, action='store_true',
                         help='Set this to print a lot of stuff. Useful for debugging. Will disable progrewss bar! '
                              'Recommended for cluster environments')
+    parser.add_argument('--td_sam_mode', action="store_true", help='make it available for 3d')
     args, unrecognized_args = parser.parse_known_args()
-    preprocess(args.d, args.plans_name, configurations=args.c, num_processes=args.np, verbose=args.verbose)
+    preprocess(args.d, args.plans_name, configurations=args.c, num_processes=args.np, verbose=args.verbose, TDSAMMode=args.td_sam_mode)
 
 
 def plan_and_preprocess_entry():
@@ -166,11 +168,12 @@ def plan_and_preprocess_entry():
     parser.add_argument('--verbose', required=False, action='store_true',
                         help='Set this to print a lot of stuff. Useful for debugging. Will disable progrewss bar! '
                              'Recommended for cluster environments')
+    parser.add_argument('--td_sam_mode', action="store_true", help='make it available for 3d')
     args = parser.parse_args()
 
     # fingerprint extraction
     print("Fingerprint extraction...")
-    extract_fingerprints(args.d, args.fpe, args.npfp, args.verify_dataset_integrity, args.clean, args.verbose)
+    extract_fingerprints(args.d, args.fpe, args.npfp, args.verify_dataset_integrity, args.clean, args.verbose, args.td_sam_mode)
 
     # experiment planning
     print('Experiment planning...')
@@ -179,7 +182,7 @@ def plan_and_preprocess_entry():
     # preprocessing
     if not args.no_pp:
         print('Preprocessing...')
-        preprocess(args.d, args.overwrite_plans_name, args.c, args.np, args.verbose)
+        preprocess(args.d, args.overwrite_plans_name, args.c, args.np, args.verbose, args.td_sam_mode)
 
 
 if __name__ == '__main__':

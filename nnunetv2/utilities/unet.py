@@ -130,7 +130,7 @@ class SAMConvUNet(nn.Module):
                                         nonlin_first=nonlin_first)
         self.decoder = SAMDecoder(self.encoder, num_classes, n_conv_per_stage_decoder, deep_supervision,
                                    nonlin_first=nonlin_first)
-        
+
 
         save_path = os.environ["WEIGHT_PATH"]
         model_weight_path = os.path.join(save_path, "mobile_sam.pt")
