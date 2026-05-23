@@ -16,6 +16,7 @@ from typing import Union, Tuple
 
 import nnunetv2
 import numpy as np
+from functools import partial
 from acvl_utils.miscellaneous.ptqdm import ptqdm
 from batchgenerators.utilities.file_and_folder_operations import *
 from nnunetv2.paths import nnUNet_preprocessed, nnUNet_raw
@@ -226,7 +227,8 @@ class DefaultPreprocessor(object):
         # list of segmentation filenames
         seg_fnames = [join(nnUNet_raw, dataset_name, 'labelsTr', i + file_ending) for i in identifiers]
 
-        _ = ptqdm(self.run_case_save, (output_filenames_truncated, image_fnames, seg_fnames, TDSAMMode),
+        run_case_save_partial = partial(self.run_case_save, TDSAMMode=TDSAMMode)
+        _ = ptqdm(run_case_save_partial, (output_filenames_truncated, image_fnames, seg_fnames),
                   processes=num_processes, zipped=True, plans_manager=plans_manager,
                   configuration_manager=configuration_manager,
                   dataset_json=dataset_json, disable=self.verbose)
