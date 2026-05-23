@@ -149,7 +149,7 @@ def verify_dataset_integrity(folder: str, num_processes: int = 8, TDSAMMode=True
     num_modalities = len(dataset_json['channel_names'].keys()
                          if 'channel_names' in dataset_json.keys()
                          else dataset_json['modality'].keys())
-    if TDSAMMode: num_modalities += 1
+    # if TDSAMMode: num_modalities += 1
     file_ending = dataset_json['file_ending']
 
     training_identifiers = get_identifiers_from_splitted_dataset_folder(join(folder, 'imagesTr'), file_ending=file_ending)
