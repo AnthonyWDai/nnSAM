@@ -62,9 +62,10 @@ def plan_experiment_entry():
                              'differently named plans file such that the nnunet default plans are not '
                              'overwritten. You will then need to specify your custom plans file with -p whenever '
                              'running other nnunet commands (training, inference etc)')
+    parser.add_argument('--td_sam_mode', action="store_true", help='make it available for 3d')
     args, unrecognized_args = parser.parse_known_args()
     plan_experiments(args.d, args.pl, args.gpu_memory_target, args.preprocessor_name, args.overwrite_target_spacing,
-                     args.overwrite_plans_name)
+                     args.overwrite_plans_name, args.td_sam_mode)
 
 
 def preprocess_entry():
@@ -177,7 +178,7 @@ def plan_and_preprocess_entry():
 
     # experiment planning
     print('Experiment planning...')
-    plan_experiments(args.d, args.pl, args.gpu_memory_target, args.preprocessor_name, args.overwrite_target_spacing, args.overwrite_plans_name)
+    plan_experiments(args.d, args.pl, args.gpu_memory_target, args.preprocessor_name, args.overwrite_target_spacing, args.overwrite_plans_name, args.td_sam_mode)
 
     # preprocessing
     if not args.no_pp:

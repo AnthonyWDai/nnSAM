@@ -26,7 +26,7 @@ def extract_fingerprint_dataset(dataset_id: int,
     print(dataset_name)
 
     if check_dataset_integrity:
-        verify_dataset_integrity(join(nnUNet_raw, dataset_name), num_processes)
+        verify_dataset_integrity(join(nnUNet_raw, dataset_name), num_processes, TDSAMMode)
 
     fpe = fingerprint_extractor_class(dataset_id, num_processes, verbose=verbose)
     return fpe.run(overwrite_existing=clean, TDSAMMode=TDSAMMode)
@@ -51,7 +51,7 @@ def plan_experiment_dataset(dataset_id: int,
                             experiment_planner_class: Type[ExperimentPlanner] = ExperimentPlanner,
                             gpu_memory_target_in_gb: float = 8, preprocess_class_name: str = 'DefaultPreprocessor',
                             overwrite_target_spacing: Optional[Tuple[float, ...]] = None,
-                            overwrite_plans_name: Optional[str] = None) -> dict:
+                            overwrite_plans_name: Optional[str] = None, TDSAMModel: bool=True) -> dict:
     """
     overwrite_target_spacing ONLY applies to 3d_fullres and 3d_cascade fullres!
     """
@@ -64,6 +64,7 @@ def plan_experiment_dataset(dataset_id: int,
                                     overwrite_target_spacing=[float(i) for i in overwrite_target_spacing] if
                                     overwrite_target_spacing is not None else overwrite_target_spacing,
                                     suppress_transpose=False,  # might expose this later,
+                                    TDSAMModel=TDSAMModel,
                                     **kwargs
                                     ).plan_experiment()
 
@@ -71,7 +72,7 @@ def plan_experiment_dataset(dataset_id: int,
 def plan_experiments(dataset_ids: List[int], experiment_planner_class_name: str = 'ExperimentPlanner',
                      gpu_memory_target_in_gb: float = 8, preprocess_class_name: str = 'DefaultPreprocessor',
                      overwrite_target_spacing: Optional[Tuple[float, ...]] = None,
-                     overwrite_plans_name: Optional[str] = None):
+                     overwrite_plans_name: Optional[str] = None, TDSAMModel: bool=True):
     """
     overwrite_target_spacing ONLY applies to 3d_fullres and 3d_cascade fullres!
     """
@@ -80,7 +81,7 @@ def plan_experiments(dataset_ids: List[int], experiment_planner_class_name: str 
                                                      current_module="nnunetv2.experiment_planning")
     for d in dataset_ids:
         plan_experiment_dataset(d, experiment_planner, gpu_memory_target_in_gb, preprocess_class_name,
-                                overwrite_target_spacing, overwrite_plans_name)
+                                overwrite_target_spacing, overwrite_plans_name, TDSAMModel)
 
 
 def preprocess_dataset(dataset_id: int,
