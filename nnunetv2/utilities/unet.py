@@ -86,8 +86,6 @@ class PlainConvUNet(nn.Module):
         return self.encoder.compute_conv_feature_map_size(input_size) + self.decoder.compute_conv_feature_map_size(input_size)
 
 
-
-
 class SAMConvUNet(nn.Module):
     def __init__(self,
                  input_channels: int,
@@ -148,6 +146,7 @@ class SAMConvUNet(nn.Module):
         
         self.sam_image_encoder = mobile_sam.image_encoder
 
+        # TODO: fix sam encoder weight
         for param in self.sam_image_encoder.parameters():
             param.requires_grad = False
 
