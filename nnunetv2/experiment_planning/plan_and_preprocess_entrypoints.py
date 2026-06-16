@@ -23,9 +23,10 @@ def extract_fingerprint_entry():
     parser.add_argument('--verbose', required=False, action='store_true',
                         help='Set this to print a lot of stuff. Useful for debugging. Will disable progrewss bar! '
                              'Recommended for cluster environments')
-    parser.add_argument('--td_sam_mode', action="store_true", help='make it available for 3d')
+    parser.add_argument('--third_channel_mode', type=str, default=None, help='make it available for 3d')
+    parser.add_argument('--third_channel_clip_max', type=float, default=100, help='make it available for 3d, third channel by clipping SUV')
     args, unrecognized_args = parser.parse_known_args()
-    extract_fingerprints(args.d, args.fpe, args.np, args.verify_dataset_integrity, args.clean, args.verbose, args.td_sam_mode)
+    extract_fingerprints(args.d, args.fpe, args.np, args.verify_dataset_integrity, args.clean, args.verbose, args.third_channel_mode, args.third_channel_clip_max)
 
 
 def plan_experiment_entry():
@@ -62,10 +63,11 @@ def plan_experiment_entry():
                              'differently named plans file such that the nnunet default plans are not '
                              'overwritten. You will then need to specify your custom plans file with -p whenever '
                              'running other nnunet commands (training, inference etc)')
-    parser.add_argument('--td_sam_mode', action="store_true", help='make it available for 3d')
+    parser.add_argument('--third_channel_mode', type=str, default=None, help='make it available for 3d')
+    parser.add_argument('--third_channel_clip_max', type=float, default=100, help='make it available for 3d, third channel by clipping SUV')
     args, unrecognized_args = parser.parse_known_args()
     plan_experiments(args.d, args.pl, args.gpu_memory_target, args.preprocessor_name, args.overwrite_target_spacing,
-                     args.overwrite_plans_name, args.td_sam_mode)
+                     args.overwrite_plans_name, args.third_channel_mode, args.third_channel_clip_max)
 
 
 def preprocess_entry():
@@ -95,9 +97,10 @@ def preprocess_entry():
     parser.add_argument('--verbose', required=False, action='store_true',
                         help='Set this to print a lot of stuff. Useful for debugging. Will disable progrewss bar! '
                              'Recommended for cluster environments')
-    parser.add_argument('--td_sam_mode', action="store_true", help='make it available for 3d')
+    parser.add_argument('--third_channel_mode', type=str, default=None, help='make it available for 3d')
+    parser.add_argument('--third_channel_clip_max', type=float, default=100, help='make it available for 3d, third channel by clipping SUV')
     args, unrecognized_args = parser.parse_known_args()
-    preprocess(args.d, args.plans_name, configurations=args.c, num_processes=args.np, verbose=args.verbose, TDSAMMode=args.td_sam_mode)
+    preprocess(args.d, args.plans_name, configurations=args.c, num_processes=args.np, verbose=args.verbose, third_channel_mode=args.third_channel_mode, third_channel_clip_max=args.third_channel_clip_max)
 
 
 def plan_and_preprocess_entry():
@@ -169,21 +172,22 @@ def plan_and_preprocess_entry():
     parser.add_argument('--verbose', required=False, action='store_true',
                         help='Set this to print a lot of stuff. Useful for debugging. Will disable progrewss bar! '
                              'Recommended for cluster environments')
-    parser.add_argument('--td_sam_mode', action="store_true", help='make it available for 3d')
+    parser.add_argument('--third_channel_mode', type=str, default=None, help='make it available for 3d')
+    parser.add_argument('--third_channel_clip_max', type=float, default=100, help='make it available for 3d, third channel by clipping SUV')
     args = parser.parse_args()
 
     # fingerprint extraction
     print("Fingerprint extraction...")
-    extract_fingerprints(args.d, args.fpe, args.npfp, args.verify_dataset_integrity, args.clean, args.verbose, args.td_sam_mode)
+    extract_fingerprints(args.d, args.fpe, args.npfp, args.verify_dataset_integrity, args.clean, args.verbose, args.third_channel_mode, args.third_channel_clip_max)
 
     # experiment planning
     print('Experiment planning...')
-    plan_experiments(args.d, args.pl, args.gpu_memory_target, args.preprocessor_name, args.overwrite_target_spacing, args.overwrite_plans_name, args.td_sam_mode)
+    plan_experiments(args.d, args.pl, args.gpu_memory_target, args.preprocessor_name, args.overwrite_target_spacing, args.overwrite_plans_name, args.third_channel_mode, args.third_channel_clip_max)
 
     # preprocessing
     if not args.no_pp:
         print('Preprocessing...')
-        preprocess(args.d, args.overwrite_plans_name, args.c, args.np, args.verbose, args.td_sam_mode)
+        preprocess(args.d, args.overwrite_plans_name, args.c, args.np, args.verbose, args.third_channel_mode, args.third_channel_clip_max)
 
 
 if __name__ == '__main__':

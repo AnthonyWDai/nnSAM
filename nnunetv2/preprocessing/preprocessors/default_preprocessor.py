@@ -38,7 +38,7 @@ class DefaultPreprocessor(object):
 
     def run_case(self, image_files: List[str], seg_file: Union[str, None], plans_manager: PlansManager,
                 configuration_manager: ConfigurationManager,
-                dataset_json: Union[dict, str], TDSAMMode: bool):
+                dataset_json: Union[dict, str], third_channel_mode: int, third_channel_clip_max: float):
         """
         seg file can be none (test cases)
         order of operations is: transpose -> crop -> resample
@@ -52,17 +52,57 @@ class DefaultPreprocessor(object):
         # load image(s)
         data, data_properites = rw.read_images(image_files)
 
-        # If TDSAMMode is enabled and there are exactly 2 image modalities,
-        # create a 3rd modality as the average of the first two.
+        # If third_channel_mode is enabled and there are exactly 2 image modalities,
+        # create a 3rd modality according to third_channel_mode.
         # Expected data shape: (C, ...)
-        if TDSAMMode:
+        if third_channel_mode:
             if data.shape[0] == 2:
-                avg_modality = ((data[0].astype(np.float32) + data[1].astype(np.float32)) / 2.0)[None]
-                data = np.concatenate((data, avg_modality), axis=0)
+                c0 = data[0]
+                c1 = data[1]
+
+                if third_channel_mode == "first":
+                    third_modality = c0[None]
+
+                elif third_channel_mode == "second":
+                    third_modality = c1[None]
+
+                elif third_channel_mode == "avg":
+                    third_modality = (
+                        (c0.astype(np.float32) + c1.astype(np.float32)) / 2.0
+                    )[None]
+
+                elif third_channel_mode == "repeat_first":
+                    data = np.stack((c0, c0, c0), axis=0)
+                    third_modality = None
+
+                elif third_channel_mode == "repeat_second":
+                    data = np.stack((c1, c1, c1), axis=0)
+                    third_modality = None
+
+                elif third_channel_mode == "clip_second":
+                    if third_channel_clip_max is None:
+                        raise ValueError(
+                            "third_channel_mode='clip_second' requires "
+                            "third_channel_clip_max to be set."
+                        )
+                    third_modality = np.clip(c1, a_min=None, a_max=third_channel_clip_max)[None]
+
+                else:
+                    raise ValueError(
+                        f"Unknown third_channel_mode: {third_channel_mode}. "
+                        f"Supported: first, second, avg, repeat_first, "
+                        f"repeat_second, clip_second"
+                    )
+
+                if third_modality is not None:
+                    data = np.concatenate((data, third_modality), axis=0)
+
             else:
                 if self.verbose:
-                    print(f"TDSAMMode=True, but found {data.shape[0]} modalities. "
-                        f"Skipping synthetic 3rd modality generation.")
+                    print(
+                        f"third_channel_mode=True, but found {data.shape[0]} modalities. "
+                        f"Skipping synthetic 3rd modality generation."
+                    )
 
         # if possible, load seg
         if seg_file is not None:
@@ -136,8 +176,8 @@ class DefaultPreprocessor(object):
 
     def run_case_save(self, output_filename_truncated: str, image_files: List[str], seg_file: str,
                       plans_manager: PlansManager, configuration_manager: ConfigurationManager,
-                      dataset_json: Union[dict, str], TDSAMMode: bool):
-        data, seg, properties = self.run_case(image_files, seg_file, plans_manager, configuration_manager, dataset_json, TDSAMMode)
+                      dataset_json: Union[dict, str], third_channel_mode: int):
+        data, seg, properties = self.run_case(image_files, seg_file, plans_manager, configuration_manager, dataset_json, third_channel_mode)
         # print('dtypes', data.dtype, seg.dtype)
         np.savez_compressed(output_filename_truncated + '.npz', data=data, seg=seg)
         write_pickle(properties, output_filename_truncated + '.pkl')
@@ -186,7 +226,7 @@ class DefaultPreprocessor(object):
         return data
 
     def run(self, dataset_name_or_id: Union[int, str], configuration_name: str, plans_identifier: str,
-            num_processes: int, TDSAMMode: bool):
+            num_processes: int, third_channel_mode: int):
         """
         data identifier = configuration name in plans. EZ.
         """
@@ -227,7 +267,7 @@ class DefaultPreprocessor(object):
         # list of segmentation filenames
         seg_fnames = [join(nnUNet_raw, dataset_name, 'labelsTr', i + file_ending) for i in identifiers]
 
-        run_case_save_partial = partial(self.run_case_save, TDSAMMode=TDSAMMode)
+        run_case_save_partial = partial(self.run_case_save, third_channel_mode=third_channel_mode)
         _ = ptqdm(run_case_save_partial, (output_filenames_truncated, image_fnames, seg_fnames),
                   processes=num_processes, zipped=True, plans_manager=plans_manager,
                   configuration_manager=configuration_manager,

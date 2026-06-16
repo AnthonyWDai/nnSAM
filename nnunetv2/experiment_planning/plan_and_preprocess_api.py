@@ -18,7 +18,7 @@ def extract_fingerprint_dataset(dataset_id: int,
                                 fingerprint_extractor_class: Type[
                                     DatasetFingerprintExtractor] = DatasetFingerprintExtractor,
                                 num_processes: int = default_num_processes, check_dataset_integrity: bool = False,
-                                clean: bool = True, verbose: bool = True, TDSAMMode: bool=False):
+                                clean: bool = True, verbose: bool = True, third_channel_mode=None, third_channel_clip_max=100):
     """
     Returns the fingerprint as a dictionary (additionally to saving it)
     """
@@ -26,15 +26,15 @@ def extract_fingerprint_dataset(dataset_id: int,
     print(dataset_name)
 
     if check_dataset_integrity:
-        verify_dataset_integrity(join(nnUNet_raw, dataset_name), num_processes, TDSAMMode)
+        verify_dataset_integrity(join(nnUNet_raw, dataset_name), num_processes, third_channel_mode, third_channel_clip_max)
 
     fpe = fingerprint_extractor_class(dataset_id, num_processes, verbose=verbose)
-    return fpe.run(overwrite_existing=clean, TDSAMMode=TDSAMMode)
+    return fpe.run(overwrite_existing=clean, third_channel_mode=third_channel_mode, third_channel_clip_max=third_channel_clip_max)
 
 
 def extract_fingerprints(dataset_ids: List[int], fingerprint_extractor_class_name: str = 'DatasetFingerprintExtractor',
                          num_processes: int = default_num_processes, check_dataset_integrity: bool = False,
-                         clean: bool = True, verbose: bool = True, TDSAMMode=False):
+                         clean: bool = True, verbose: bool = True, third_channel_mode=None, third_channel_clip_max=100):
     """
     clean = False will not actually run this. This is just a switch for use with nnUNetv2_plan_and_preprocess where
     we don't want to rerun fingerprint extraction every time.
@@ -44,14 +44,14 @@ def extract_fingerprints(dataset_ids: List[int], fingerprint_extractor_class_nam
                                                               current_module="nnunetv2.experiment_planning")
     for d in dataset_ids:
         extract_fingerprint_dataset(d, fingerprint_extractor_class, num_processes, check_dataset_integrity, clean,
-                                    verbose, TDSAMMode)
+                                    verbose, third_channel_mode, third_channel_clip_max)
 
 
 def plan_experiment_dataset(dataset_id: int,
                             experiment_planner_class: Type[ExperimentPlanner] = ExperimentPlanner,
                             gpu_memory_target_in_gb: float = 8, preprocess_class_name: str = 'DefaultPreprocessor',
                             overwrite_target_spacing: Optional[Tuple[float, ...]] = None,
-                            overwrite_plans_name: Optional[str] = None, TDSAMModel: bool=True) -> dict:
+                            overwrite_plans_name: Optional[str] = None, third_channel_mode="avg", third_channel_clip_max=100) -> dict:
     """
     overwrite_target_spacing ONLY applies to 3d_fullres and 3d_cascade fullres!
     """
@@ -64,7 +64,8 @@ def plan_experiment_dataset(dataset_id: int,
                                     overwrite_target_spacing=[float(i) for i in overwrite_target_spacing] if
                                     overwrite_target_spacing is not None else overwrite_target_spacing,
                                     suppress_transpose=False,  # might expose this later,
-                                    TDSAMModel=TDSAMModel,
+                                    third_channel_mode=third_channel_mode,
+                                    third_channel_clip_max=third_channel_clip_max,
                                     **kwargs
                                     ).plan_experiment()
 
@@ -72,7 +73,7 @@ def plan_experiment_dataset(dataset_id: int,
 def plan_experiments(dataset_ids: List[int], experiment_planner_class_name: str = 'ExperimentPlanner',
                      gpu_memory_target_in_gb: float = 8, preprocess_class_name: str = 'DefaultPreprocessor',
                      overwrite_target_spacing: Optional[Tuple[float, ...]] = None,
-                     overwrite_plans_name: Optional[str] = None, TDSAMModel: bool=True):
+                     overwrite_plans_name: Optional[str] = None, third_channel_mode="avg", third_channel_clip_max=100):
     """
     overwrite_target_spacing ONLY applies to 3d_fullres and 3d_cascade fullres!
     """
@@ -81,14 +82,14 @@ def plan_experiments(dataset_ids: List[int], experiment_planner_class_name: str 
                                                      current_module="nnunetv2.experiment_planning")
     for d in dataset_ids:
         plan_experiment_dataset(d, experiment_planner, gpu_memory_target_in_gb, preprocess_class_name,
-                                overwrite_target_spacing, overwrite_plans_name, TDSAMModel)
+                                overwrite_target_spacing, overwrite_plans_name, third_channel_mode, third_channel_clip_max)
 
 
 def preprocess_dataset(dataset_id: int,
                        plans_identifier: str = 'nnUNetPlans',
                        configurations: Union[Tuple[str], List[str]] = ('2d', '3d_fullres', '3d_lowres'),
                        num_processes: Union[int, Tuple[int, ...], List[int]] = (8, 4, 8),
-                       verbose: bool = False, TDSAMMode: bool=True) -> None:
+                       verbose: bool = False, third_channel_mode="avg", third_channel_clip_max=100) -> None:
     if not isinstance(num_processes, list):
         num_processes = list(num_processes)
     if len(num_processes) == 1:
@@ -113,7 +114,7 @@ def preprocess_dataset(dataset_id: int,
             continue
         configuration_manager = plans_manager.get_configuration(c)
         preprocessor = configuration_manager.preprocessor_class(verbose=verbose)
-        preprocessor.run(dataset_id, c, plans_identifier, num_processes=n, TDSAMMode=TDSAMMode)
+        preprocessor.run(dataset_id, c, plans_identifier, num_processes=n, third_channel_mode=third_channel_mode, third_channel_clip_max=third_channel_clip_max)
     maybe_mkdir_p(join(nnUNet_preprocessed, dataset_name, 'gt_segmentations'))
     [shutil.copy(i, join(join(nnUNet_preprocessed, dataset_name, 'gt_segmentations'))) for i in
      subfiles(join(nnUNet_raw, dataset_name, 'labelsTr'))]
@@ -123,6 +124,6 @@ def preprocess(dataset_ids: List[int],
                plans_identifier: str = 'nnUNetPlans',
                configurations: Union[Tuple[str], List[str]] = ('2d', '3d_fullres', '3d_lowres'),
                num_processes: Union[int, Tuple[int, ...], List[int]] = (8, 4, 8),
-               verbose: bool = False, TDSAMMode: bool=True):
+               verbose: bool = False, third_channel_mode="avg", third_channel_clip_max=100):
     for d in dataset_ids:
-        preprocess_dataset(d, plans_identifier, configurations, num_processes, verbose, TDSAMMode)
+        preprocess_dataset(d, plans_identifier, configurations, num_processes, verbose, third_channel_mode, third_channel_clip_max)

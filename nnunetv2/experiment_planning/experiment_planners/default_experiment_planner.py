@@ -25,7 +25,8 @@ class ExperimentPlanner(object):
                  preprocessor_name: str = 'DefaultPreprocessor', plans_name: str = 'nnUNetPlans',
                  overwrite_target_spacing: Union[List[float], Tuple[float, ...]] = None,
                  suppress_transpose: bool = False,
-                 TDSAMModel: bool = False,
+                 third_channel_mode=None,
+                 third_channel_clip_max=100,
     ):
         """
         overwrite_target_spacing only affects 3d_fullres! (but by extension 3d_lowres which starts with fullres may
@@ -37,7 +38,7 @@ class ExperimentPlanner(object):
         self.raw_dataset_folder = join(nnUNet_raw, self.dataset_name)
         preprocessed_folder = join(nnUNet_preprocessed, self.dataset_name)
         self.dataset_json = load_json(join(self.raw_dataset_folder, 'dataset.json'))
-        self.TDSAMModel = TDSAMModel
+        self.third_channel_mode = third_channel_mode
 
         # load dataset fingerprint
         if not isfile(join(preprocessed_folder, 'dataset_fingerprint.json')):
@@ -205,7 +206,7 @@ class ExperimentPlanner(object):
                   'enforced soon!')
         modalities = self.dataset_json['channel_names'] if 'channel_names' in self.dataset_json.keys() else \
             self.dataset_json['modality']
-        if self.TDSAMModel: modalities["2"] = "CT"
+        if self.third_channel_mode: modalities["2"] = "CT"
         normalization_schemes = [get_normalization_scheme(m) for m in modalities.values()]
         if self.dataset_fingerprint['median_relative_size_after_cropping'] < (3 / 4.):
             use_nonzero_mask_for_norm = [i.leaves_pixels_outside_mask_at_zero_if_use_mask_for_norm_is_true for i in

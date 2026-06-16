@@ -31,10 +31,11 @@ class PreprocessAdapter(DataLoader):
     def __init__(self, list_of_lists: List[List[str]], list_of_segs_from_prev_stage_files: Union[List[None], List[str]],
                  preprocessor: DefaultPreprocessor, output_filenames_truncated: List[str],
                  plans_manager: PlansManager, dataset_json: dict, configuration_manager: ConfigurationManager,
-                 num_threads_in_multithreaded: int = 1, TDSAMMode: bool=False):
+                 num_threads_in_multithreaded: int = 1, third_channel_mode=None, third_channel_clip_max=100):
         self.preprocessor, self.plans_manager, self.configuration_manager, self.dataset_json = \
             preprocessor, plans_manager, configuration_manager, dataset_json
-        self.TDSAMMode = TDSAMMode
+        self.third_channel_mode = third_channel_mode
+        self.third_channel_clip_max = third_channel_clip_max
 
         self.label_manager = plans_manager.get_label_manager(dataset_json)
 
@@ -56,7 +57,8 @@ class PreprocessAdapter(DataLoader):
         data, seg, data_properites = self.preprocessor.run_case(files, seg_prev_stage, self.plans_manager,
                                                                 self.configuration_manager,
                                                                 self.dataset_json,
-                                                                TDSAMMode=self.TDSAMMode)
+                                                                third_channel_mode=self.third_channel_mode,
+                                                                third_channel_clip_max=self.third_channel_clip_max)
         if seg_prev_stage is not None:
             seg_onehot = convert_labelmap_to_one_hot(seg[0], self.label_manager.foreground_labels, data.dtype)
             data = np.vstack((data, seg_onehot))
@@ -130,7 +132,8 @@ def predict_from_raw_data(list_of_lists_or_source_folder: Union[str, List[List[s
                           num_parts: int = 1,
                           part_id: int = 0,
                           device: torch.device = torch.device('cuda'),
-                          TDSAMMode: bool=False,
+                          third_channel_mode=None,
+                          third_channel_clip_max=100,
                           ):
     print("\n#######################################################################\nPlease cite the following paper "
           "when using nnU-Net:\n"
@@ -179,7 +182,7 @@ def predict_from_raw_data(list_of_lists_or_source_folder: Union[str, List[List[s
                                   use_folds, tile_step_size, use_gaussian, use_mirroring, perform_everything_on_gpu,
                                   verbose, False, overwrite, checkpoint_name,
                                   num_processes_preprocessing, num_processes_segmentation_export, None,
-                                  num_parts=num_parts, part_id=part_id, device=device, TDSAMMode=TDSAMMode)
+                                  num_parts=num_parts, part_id=part_id, device=device, third_channel_mode=third_channel_mode, third_channel_clip_max=third_channel_clip_max)
 
     # sort out input and output filenames
     if isinstance(list_of_lists_or_source_folder, str):
@@ -214,7 +217,7 @@ def predict_from_raw_data(list_of_lists_or_source_folder: Union[str, List[List[s
     num_processes = max(1, min(num_processes_preprocessing, len(list_of_lists_or_source_folder)))
     ppa = PreprocessAdapter(list_of_lists_or_source_folder, seg_from_prev_stage_files, preprocessor,
                             output_filename_truncated, plans_manager, dataset_json,
-                            configuration_manager, num_processes, TDSAMMode)
+                            configuration_manager, num_processes, third_channel_mode, third_channel_clip_max)
     mta = MultiThreadedAugmenter(ppa, NumpyToTensor(), num_processes, 1, None, pin_memory=device.type == 'cuda')
     # mta = SingleThreadedAugmenter(ppa, NumpyToTensor())
 
@@ -437,7 +440,8 @@ def predict_entry_point_modelfolder():
                           num_processes_segmentation_export=args.nps,
                           folder_with_segs_from_prev_stage=args.prev_stage_predictions,
                           device=device,
-                          TDSAMMode=args.td_sam_mode,
+                          third_channel_mode=args.third_channel_mode,
+                          third_channel_clip_max=args.third_channel_clip_max
                           )
 
 
@@ -501,8 +505,9 @@ def predict_entry_point():
                         help="Use this to set the device the inference should run with. Available options are 'cuda' "
                              "(GPU), 'cpu' (CPU) and 'mps' (Apple M1/M2). Do NOT use this to set which GPU ID! "
                              "Use CUDA_VISIBLE_DEVICES=X nnUNetv2_predict [...] instead!")
-    parser.add_argument('--td_sam_mode', action="store_true", help='make it available for 3d')
-    
+    parser.add_argument('--third_channel_mode', action="store_true", help='make it available for 3d')
+    parser.add_argument('--third_channel_clip_max', type=float, default=100, help='make it available for 3d, third channel by clipping SUV')
+
     args = parser.parse_args()
     args.f = [i if i == 'all' else int(i) for i in args.f]
 
@@ -547,7 +552,8 @@ def predict_entry_point():
                           num_parts=args.num_parts,
                           part_id=args.part_id,
                           device=device,
-                          TDSAMMode=args.td_sam_mode
+                          third_channel_mode=args.third_channel_mode,
+                          third_channel_clip_max=args.third_channel_clip_max,
                           )
 
 

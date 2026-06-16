@@ -120,7 +120,7 @@ def check_cases(base_folder: str, case_identifier: str, expected_num_channels: i
     return ret
 
 
-def verify_dataset_integrity(folder: str, num_processes: int = 8, TDSAMMode=True) -> None:
+def verify_dataset_integrity(folder: str, num_processes: int = 8, third_channel_mode="avg", third_channel_clip_max=100) -> None:
     """
     folder needs the imagesTr, imagesTs and labelsTr subfolders. There also needs to be a dataset.json
     checks if the expected number of training cases and labels are present
@@ -149,7 +149,7 @@ def verify_dataset_integrity(folder: str, num_processes: int = 8, TDSAMMode=True
     num_modalities = len(dataset_json['channel_names'].keys()
                          if 'channel_names' in dataset_json.keys()
                          else dataset_json['modality'].keys())
-    # if TDSAMMode: num_modalities += 1
+    # if third_channel_mode: num_modalities += 1
     file_ending = dataset_json['file_ending']
 
     training_identifiers = get_identifiers_from_splitted_dataset_folder(join(folder, 'imagesTr'), file_ending=file_ending)

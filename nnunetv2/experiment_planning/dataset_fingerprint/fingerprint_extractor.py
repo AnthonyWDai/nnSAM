@@ -102,7 +102,7 @@ class DatasetFingerprintExtractor(object):
         return shape_after_crop, spacing, foreground_intensities_per_channel, foreground_intensity_stats_per_channel, \
                relative_size_after_cropping
 
-    def run(self, overwrite_existing: bool = False, TDSAMMode=True) -> dict:
+    def run(self, overwrite_existing: bool = False, third_channel_mode="avg", third_channel_clip_max=100) -> dict:
         # we do not save the properties file in self.input_folder because that folder might be read-only. We can only
         # reliably write in nnUNet_preprocessed and nnUNet_results, so nnUNet_preprocessed it is
         preprocessed_output_folder = join(nnUNet_preprocessed, self.dataset_name)
@@ -136,11 +136,42 @@ class DatasetFingerprintExtractor(object):
             spacings = [r[1] for r in results]
             foreground_intensities_per_channel = [np.concatenate([r[2][i] for r in results]) for i in
                                                   range(len(results[0][2]))]
-            if TDSAMMode:
-                foreground_intensities_per_channel += [
-                    (foreground_intensities_per_channel[0] + 
-                     foreground_intensities_per_channel[1]) / 2
-                ]
+            if third_channel_mode:
+                if len(foreground_intensities_per_channel) == 2:
+                    f0 = foreground_intensities_per_channel[0]
+                    f1 = foreground_intensities_per_channel[1]
+
+                    if third_channel_mode == "first":
+                        foreground_intensities_per_channel += [f0]
+
+                    elif third_channel_mode == "second":
+                        foreground_intensities_per_channel += [f1]
+
+                    elif third_channel_mode == "avg":
+                        foreground_intensities_per_channel += [(f0 + f1) / 2]
+
+                    elif third_channel_mode == "repeat_first":
+                        foreground_intensities_per_channel = [f0, f0, f0]
+
+                    elif third_channel_mode == "repeat_second":
+                        foreground_intensities_per_channel = [f1, f1, f1]
+
+                    elif third_channel_mode == "clip_second":
+                        if third_channel_clip_max is None:
+                            raise ValueError(
+                                "third_channel_mode='clip_second' requires "
+                                "third_channel_clip_max to be set."
+                            )
+                        foreground_intensities_per_channel += [
+                            np.clip(f1, a_min=None, a_max=third_channel_clip_max)
+                        ]
+
+                    else:
+                        raise ValueError(
+                            f"Unknown third_channel_mode: {third_channel_mode}. "
+                            f"Supported: first, second, avg, repeat_first, "
+                            f"repeat_second, clip_second"
+                        )
             # we drop this so that the json file is somewhat human readable
             # foreground_intensity_stats_by_case_and_modality = [r[3] for r in results]
             median_relative_size_after_cropping = np.median([r[4] for r in results], 0)
@@ -148,7 +179,7 @@ class DatasetFingerprintExtractor(object):
             num_channels = len(self.dataset_json['channel_names'].keys()
                                  if 'channel_names' in self.dataset_json.keys()
                                  else self.dataset_json['modality'].keys())
-            if TDSAMMode: num_channels += 1
+            if third_channel_mode: num_channels += 1
             intensity_statistics_per_channel = {}
             for i in range(num_channels):
                 intensity_statistics_per_channel[i] = {
