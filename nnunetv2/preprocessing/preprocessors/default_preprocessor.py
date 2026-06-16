@@ -176,8 +176,8 @@ class DefaultPreprocessor(object):
 
     def run_case_save(self, output_filename_truncated: str, image_files: List[str], seg_file: str,
                       plans_manager: PlansManager, configuration_manager: ConfigurationManager,
-                      dataset_json: Union[dict, str], third_channel_mode: int):
-        data, seg, properties = self.run_case(image_files, seg_file, plans_manager, configuration_manager, dataset_json, third_channel_mode)
+                      dataset_json: Union[dict, str], third_channel_mode: int, third_channel_clip_max: float):
+        data, seg, properties = self.run_case(image_files, seg_file, plans_manager, configuration_manager, dataset_json, third_channel_mode, third_channel_clip_max)
         # print('dtypes', data.dtype, seg.dtype)
         np.savez_compressed(output_filename_truncated + '.npz', data=data, seg=seg)
         write_pickle(properties, output_filename_truncated + '.pkl')
@@ -226,7 +226,7 @@ class DefaultPreprocessor(object):
         return data
 
     def run(self, dataset_name_or_id: Union[int, str], configuration_name: str, plans_identifier: str,
-            num_processes: int, third_channel_mode: int):
+            num_processes: int, third_channel_mode: int, third_channel_clip_max: float):
         """
         data identifier = configuration name in plans. EZ.
         """
@@ -267,7 +267,7 @@ class DefaultPreprocessor(object):
         # list of segmentation filenames
         seg_fnames = [join(nnUNet_raw, dataset_name, 'labelsTr', i + file_ending) for i in identifiers]
 
-        run_case_save_partial = partial(self.run_case_save, third_channel_mode=third_channel_mode)
+        run_case_save_partial = partial(self.run_case_save, third_channel_mode=third_channel_mode, third_channel_clip_max=third_channel_clip_max)
         _ = ptqdm(run_case_save_partial, (output_filenames_truncated, image_fnames, seg_fnames),
                   processes=num_processes, zipped=True, plans_manager=plans_manager,
                   configuration_manager=configuration_manager,
