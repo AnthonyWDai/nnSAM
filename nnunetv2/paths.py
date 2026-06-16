@@ -19,7 +19,7 @@ PLEASE READ paths.md FOR INFORMATION TO HOW TO SET THIS UP
 """
 nnUNet_raw = os.environ.get('nnUNet_raw')
 nnUNet_preprocessed = os.environ.get('nnUNet_preprocessed')
-nnUNet_results = os.path.join(os.environ.get('nnUNet_results'), os.environ.get('MODEL_NAME'))
+nnUNet_results = os.path.join(os.environ.get('nnUNet_results')) # os.environ.get('MODEL_NAME')
 os.makedirs(nnUNet_results, exist_ok=True)
 
 if nnUNet_raw is None:
