@@ -56,7 +56,7 @@ class DefaultPreprocessor(object):
         # create a 3rd modality according to third_channel_mode.
         # Expected data shape: (C, ...)
         if third_channel_mode:
-            if data.shape[0] == 2:
+            if data.shape[0] in [2, 3]:
                 c0 = data[0]
                 c1 = data[1]
 
@@ -65,6 +65,9 @@ class DefaultPreprocessor(object):
 
                 elif third_channel_mode == "second":
                     third_modality = c1[None]
+
+                elif third_channel_mode == "third_modality" and data.shape[0] == 3:
+                    third_modality = data[2]
 
                 elif third_channel_mode == "avg":
                     third_modality = (
