@@ -1,3 +1,4 @@
+import warnings
 from abc import ABC, abstractmethod
 from typing import Type
 
@@ -32,8 +33,13 @@ class ZScoreNormalization(ImageNormalization):
         here seg is used to store the zero valued region. The value for that region in the segmentation is -1 by
         default.
         """
-        image = image.astype(self.target_dtype)
-        if self.use_mask_for_norm is not None and self.use_mask_for_norm:
+        eps = 1e-8 if not self.target_dtype == np.float16 else 1e-4
+        image = image.astype(self.target_dtype, copy=False)
+        if self.use_mask_for_norm:
+            assert seg is not None, ("use_mask_for_norm is set, please provide a mask for the nonzero areas of the "
+                                     "image via seg. The mask will be computed as `mask = seg >= 0`. You can use "
+                                     "create_nonzero_mask from nnunetv2/preprocessing/cropping")
+        if seg is not None and self.use_mask_for_norm:
             # negative values in the segmentation encode the 'outside' region (think zero values around the brain as
             # in BraTS). We want to run the normalization only in the brain region, so we need to mask the image.
             # The default nnU-net sets use_mask_for_norm to True if cropping to the nonzero region substantially
@@ -41,11 +47,12 @@ class ZScoreNormalization(ImageNormalization):
             mask = seg >= 0
             mean = image[mask].mean()
             std = image[mask].std()
-            image[mask] = (image[mask] - mean) / (max(std, 1e-8))
+            image[mask] = (image[mask] - mean) / (max(std, eps))
         else:
             mean = image.mean()
             std = image.std()
-            image = (image - mean) / (max(std, 1e-8))
+            image -= mean
+            image /= (max(std, eps))
         return image
 
 
@@ -54,13 +61,61 @@ class CTNormalization(ImageNormalization):
 
     def run(self, image: np.ndarray, seg: np.ndarray = None) -> np.ndarray:
         assert self.intensityproperties is not None, "CTNormalization requires intensity properties"
-        image = image.astype(self.target_dtype)
+        eps = 1e-8 if not self.target_dtype == np.float16 else 1e-4
         mean_intensity = self.intensityproperties['mean']
         std_intensity = self.intensityproperties['std']
         lower_bound = self.intensityproperties['percentile_00_5']
         upper_bound = self.intensityproperties['percentile_99_5']
-        image = np.clip(image, lower_bound, upper_bound)
-        image = (image - mean_intensity) / max(std_intensity, 1e-8)
+
+        image = image.astype(self.target_dtype, copy=False)
+        np.clip(image, lower_bound, upper_bound, out=image)
+        image -= mean_intensity
+        image /= max(std_intensity, eps)
+        return image
+
+
+class PETCTNormalization(ImageNormalization):
+    leaves_pixels_outside_mask_at_zero_if_use_mask_for_norm_is_true = False
+
+    def run(self, image: np.ndarray, seg: np.ndarray = None) -> np.ndarray:
+        if self.intensityproperties is None:
+            raise ValueError("PETCTNormalization requires intensity properties")
+
+        eps = 1e-4 if self.target_dtype == np.float16 else 1e-8
+
+        lower = self.intensityproperties.get("lower")
+        upper = self.intensityproperties.get("upper")
+
+        has_valid_dataset_bounds = (
+            lower is not None
+            and upper is not None
+            and np.isfinite(lower)
+            and np.isfinite(upper)
+            and lower < upper
+        )
+
+        if has_valid_dataset_bounds:
+            clip_low = float(lower)
+            clip_high = float(upper)
+        else:
+            # Fallback to robust image-specific percentiles
+            clip_low = float(np.percentile(image, 0.5))
+            clip_high = float(np.percentile(image, 99.5))
+            warnings("Fallback to robust image-specific percentiles")
+
+        # Final safeguard for degenerate bounds
+        if not np.isfinite(clip_low) or not np.isfinite(clip_high) or clip_low >= clip_high:
+            image = image.astype(self.target_dtype, copy=False)
+            image.fill(0)
+            return image
+
+        image = image.astype(self.target_dtype, copy=False)
+        np.clip(image, clip_low, clip_high, out=image)
+
+        # Normalize to [0, 1]
+        image -= clip_low
+        image /= max(clip_high - clip_low, eps)
+
         return image
 
 
@@ -68,16 +123,17 @@ class NoNormalization(ImageNormalization):
     leaves_pixels_outside_mask_at_zero_if_use_mask_for_norm_is_true = False
 
     def run(self, image: np.ndarray, seg: np.ndarray = None) -> np.ndarray:
-        return image.astype(self.target_dtype)
+        return image.astype(self.target_dtype, copy=False)
 
 
 class RescaleTo01Normalization(ImageNormalization):
     leaves_pixels_outside_mask_at_zero_if_use_mask_for_norm_is_true = False
 
     def run(self, image: np.ndarray, seg: np.ndarray = None) -> np.ndarray:
-        image = image.astype(self.target_dtype)
-        image = image - image.min()
-        image = image / np.clip(image.max(), a_min=1e-8, a_max=None)
+        eps = 1e-8 if not self.target_dtype == np.float16 else 1e-4
+        image = image.astype(self.target_dtype, copy=False)
+        image -= image.min()
+        image /= np.clip(image.max(), a_min=eps, a_max=None)
         return image
 
 
@@ -89,7 +145,6 @@ class RGBTo01Normalization(ImageNormalization):
                                  "Your images do not seem to be RGB images"
         assert image.max() <= 255, "RGB images are uint 8, for whatever reason I found pixel values greater than 255" \
                                    ". Your images do not seem to be RGB images"
-        image = image.astype(self.target_dtype)
-        image = image / 255.
+        image = image.astype(self.target_dtype, copy=False)
+        image /= 255.
         return image
-
