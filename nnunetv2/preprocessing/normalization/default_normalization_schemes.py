@@ -74,7 +74,7 @@ class CTNormalization(ImageNormalization):
         return image
 
 
-class PETCTNormalization(ImageNormalization):
+class CTPETNormalization(ImageNormalization):
     leaves_pixels_outside_mask_at_zero_if_use_mask_for_norm_is_true = False
 
     def run(self, image: np.ndarray, seg: np.ndarray = None) -> np.ndarray:
