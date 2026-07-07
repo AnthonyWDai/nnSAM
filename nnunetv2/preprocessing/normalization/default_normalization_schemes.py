@@ -79,7 +79,7 @@ class CTPETNormalization(ImageNormalization):
 
     def run(self, image: np.ndarray, seg: np.ndarray = None) -> np.ndarray:
         if self.intensityproperties is None:
-            raise ValueError("PETCTNormalization requires intensity properties")
+            raise ValueError("CTPETNormalization requires intensity properties")
 
         eps = 1e-4 if self.target_dtype == np.float16 else 1e-8
 
