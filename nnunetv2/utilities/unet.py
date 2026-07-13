@@ -165,7 +165,6 @@ class SAMConvUNet(nn.Module):
 
         sam_embed = F.interpolate(sam_embed, size=(skips[3].shape[2], skips[3].shape[3]), mode='bilinear', align_corners=True)
         skips[3] = torch.cat((skips[3], sam_embed), dim=1)
-        
 
         return self.decoder(skips)
 
