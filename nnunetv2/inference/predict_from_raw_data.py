@@ -505,7 +505,7 @@ def predict_entry_point():
                         help="Use this to set the device the inference should run with. Available options are 'cuda' "
                              "(GPU), 'cpu' (CPU) and 'mps' (Apple M1/M2). Do NOT use this to set which GPU ID! "
                              "Use CUDA_VISIBLE_DEVICES=X nnUNetv2_predict [...] instead!")
-    parser.add_argument('--third_channel_mode', action="store_true", help='make it available for 3d')
+    parser.add_argument('--third_channel_mode', type=str, default=None, help='make it available for 3d')
     parser.add_argument('--third_channel_clip_max', type=float, default=100, help='make it available for 3d, third channel by clipping SUV')
 
     args = parser.parse_args()
