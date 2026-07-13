@@ -217,7 +217,7 @@ def predict_from_raw_data(list_of_lists_or_source_folder: Union[str, List[List[s
     num_processes = max(1, min(num_processes_preprocessing, len(list_of_lists_or_source_folder)))
     ppa = PreprocessAdapter(list_of_lists_or_source_folder, seg_from_prev_stage_files, preprocessor,
                             output_filename_truncated, plans_manager, dataset_json,
-                            configuration_manager, num_processes, third_channel_mode, third_channel_clip_max)
+                            configuration_manager, num_processes, third_channel_mode=third_channel_mode, third_channel_clip_max=third_channel_clip_max)
     mta = MultiThreadedAugmenter(ppa, NumpyToTensor(), num_processes, 1, None, pin_memory=device.type == 'cuda')
     # mta = SingleThreadedAugmenter(ppa, NumpyToTensor())
 
